@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(13);
 insert into auth.users(id,aud,role,email) values
  ('00000000-0000-0000-0000-000000000001','authenticated','authenticated','a@test.invalid'),
  ('00000000-0000-0000-0000-000000000002','authenticated','authenticated','b@test.invalid');
@@ -10,6 +10,7 @@ insert into public.focus_sessions(id,user_id,started_at,ended_at,focused_ms,comp
  ('00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000002',now(),now(),0,true);
 insert into public.focus_rooms(id,owner_id,name,invite_code) values
  ('00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000001','A','isolation-invite');
+insert into public.sync_operations(id,user_id) values('00000000-0000-0000-0000-000000000040','00000000-0000-0000-0000-000000000001');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',true);
 select is((select count(*)::int from public.profiles),1,'profiles are isolated');
@@ -20,5 +21,12 @@ select throws_ok($$insert into public.room_members(room_id,user_id) values('0000
 select lives_ok($$select public.join_room('isolation-invite')$$,'valid invite joins room');
 select is((select count(*)::int from public.focus_rooms),1,'joined room is visible');
 select throws_ok($$insert into public.leaderboard_records(room_id,user_id,focused_ms) values('00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000002',100)$$,'42501',null,'clients cannot forge leaderboard records');
+select lives_ok($$select public.apply_settings('00000000-0000-0000-0000-000000000031','{"theme":"dark"}','[]',now()-interval '2 minutes')$$,'first settings backup works');
+select public.apply_settings('00000000-0000-0000-0000-000000000032','{"theme":"light"}','[]',now()-interval '3 minutes');
+select is((select settings->'settings'->>'theme' from public.user_preferences),'dark','older edits cannot overwrite newer settings');
+select public.apply_settings('00000000-0000-0000-0000-000000000031','{"theme":"light"}','[]',now());
+select is((select settings->'settings'->>'theme' from public.user_preferences),'dark','duplicate operation is idempotent');
+select throws_ok($$select public.apply_settings('00000000-0000-0000-0000-000000000033','{}','[]',now()+interval '10 minutes')$$,'P0001',null,'reject future clock skew');
+select throws_ok($$select public.apply_settings('00000000-0000-0000-0000-000000000040','{}','[]',now())$$,'P0001',null,'cannot reuse another users operation');
 select * from finish();
 rollback;

@@ -19,9 +19,11 @@ import kotlinx.coroutines.launch
 class CloudClient(private val app: FocusGuardApp) {
     companion object { private val authLock=Mutex() }
     private val client=OkHttpClient.Builder().callTimeout(java.time.Duration.ofSeconds(20)).build()
-    private suspend fun request(path: String, method: String = "GET", body: String? = null, authenticated: Boolean = true): String = withContext(Dispatchers.IO) {
+    private suspend fun request(path: String, method: String = "GET", body: String? = null, authenticated: Boolean = true, expectedUser: String? = null): String = withContext(Dispatchers.IO) {
         require(BuildConfig.SUPABASE_URL.startsWith("https://")) { "Configure a Supabase project before using cloud features" }
         if(authenticated) refresh()
+        suspend fun perform(): String {
+        if(expectedUser!=null) check(app.preferences.snapshot().str("userId")==expectedUser) { "Account changed during synchronization" }
         val token=if(authenticated) app.tokens.get("token") else BuildConfig.SUPABASE_ANON_KEY
         require(token.isNotBlank()) { "Sign in first" }
         val builder=Request.Builder().url(BuildConfig.SUPABASE_URL.trimEnd('/')+path)
@@ -30,13 +32,15 @@ class CloudClient(private val app: FocusGuardApp) {
         val req=builder
             .header("Prefer","resolution=ignore-duplicates,return=representation")
             .method(method,body?.toRequestBody("application/json".toMediaType())).build()
-        client.newCall(req).execute().use { response ->
+        return client.newCall(req).execute().use { response ->
             val text=response.body?.string().orEmpty()
             if(!response.isSuccessful) error("Cloud request failed (${response.code}). Check your connection and sign-in.")
             text
         }
+        }
+        if(authenticated) authLock.withLock { perform() } else perform()
     }
-    suspend fun authenticate(email: String,password: String,signup: Boolean) {
+    suspend fun authenticate(email: String,password: String,signup: Boolean) = authLock.withLock {
         val result=JSONObject(request(if(signup) "/auth/v1/signup" else "/auth/v1/token?grant_type=password","POST",JSONObject().put("email",email).put("password",password).toString(),false))
         if(!result.has("access_token")) error("Check your email to confirm your account, then sign in")
         app.preferences.bool("sync",false)
@@ -62,9 +66,9 @@ class CloudClient(private val app: FocusGuardApp) {
             val p=app.preferences.snapshot()
             if(!p.flag("syncSettings")) return
             payload.remove("user_id")
-            val response=JSONObject(request("/rest/v1/rpc/apply_settings","POST",payload.toString()))
+            val response=JSONObject(request("/rest/v1/rpc/apply_settings","POST",payload.toString(),expectedUser=user))
             if(app.preferences.snapshot().num("settingsModified")<=op.createdAt) org.focusguard.sync.SettingsSync(app).apply(response)
-        } else request("/rest/v1/${op.tableName}?on_conflict=id","POST",payload.toString())
+        } else request("/rest/v1/${op.tableName}?on_conflict=id","POST",payload.toString(),expectedUser=user)
     }
     suspend fun restore(): Int {
         refresh()
@@ -113,5 +117,5 @@ class CloudClient(private val app: FocusGuardApp) {
         org.focusguard.sync.SettingsSync(app).apply(config)
     }
     suspend fun deleteAccount() { request("/rest/v1/rpc/delete_my_account","POST","{}"); signOut() }
-    suspend fun signOut() { app.preferences.bool("sync",false); app.database.dao().clearQueue(); app.tokens.clear(); app.preferences.text("userId","") }
+    suspend fun signOut() = authLock.withLock { app.preferences.bool("sync",false); app.database.dao().clearQueue(); app.tokens.clear(); app.preferences.text("userId","") }
 }
