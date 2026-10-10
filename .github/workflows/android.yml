@@ -69,3 +69,20 @@ jobs:
           version: latest
       - run: supabase start
       - run: supabase test db
+
+  local_signing_input:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: FocusGuard-debug
+          path: build-input
+      - name: Publish unsigned input for local signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip -j FocusGuard-build-input.zip "$(find build-input -name app-release-unsigned.apk -print -quit)"
+          gh release create "build-input-${GITHUB_RUN_ID}" FocusGuard-build-input.zip --prerelease --latest=false --title "Unsigned build input for local signing" --notes "Build input only. Extract and sign locally before installing. The private signing key remains on the owner computer."
