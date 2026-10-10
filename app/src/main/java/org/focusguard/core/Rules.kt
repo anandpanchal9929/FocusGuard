@@ -13,8 +13,8 @@ data class Schedule(val start: Int, val end: Int, val days: Set<Int>) {
 }
 data class Rule(val enabled: Boolean, val always: Boolean, val focusOnly: Boolean, val limitMinutes: Int, val schedule: Schedule?)
 object RuleEngine {
-    fun reason(rule: Rule, now: ZonedDateTime, usageMs: Long?, focus: Boolean, bypassUntil: Long): String? {
-        if (!rule.enabled || now.toInstant().toEpochMilli() < bypassUntil) return null
+    fun reason(rule: Rule, now: ZonedDateTime, usageMs: Long?, focus: Boolean, bypassUntil: Long, strict: Boolean = false): String? {
+        if (!rule.enabled || (!(strict && focus) && now.toInstant().toEpochMilli() < bypassUntil)) return null
         if (rule.always) return "This app is blocked by your profile"
         if (rule.focusOnly && focus) return "Your focus session is active"
         if (rule.schedule?.active(now) == true) return "Scheduled focus time"

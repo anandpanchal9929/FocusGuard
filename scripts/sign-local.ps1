@@ -1,6 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$UnsignedApk,[Parameter(Mandatory=$true)][string]$KeyStore,[Parameter(Mandatory=$true)][string]$SdkRoot,[string]$Alias='focusguard',[string]$OutputApk='FocusGuard-v0.1.0.apk')
+param([Parameter(Mandatory=$true)][string]$UnsignedApk,[Parameter(Mandatory=$true)][string]$KeyStore,[Parameter(Mandatory=$true)][string]$SdkRoot,[string]$Alias='focusguard',[string]$OutputApk='FocusGuard-v0.1.0.apk',[string]$ProtectedPasswordFile)
 $ErrorActionPreference='Stop'
-$securePassword=Read-Host 'Keystore password' -AsSecureString
+$securePassword=if($ProtectedPasswordFile) { (Get-Content -Raw -LiteralPath $ProtectedPasswordFile).Trim() | ConvertTo-SecureString } else { Read-Host 'Keystore password' -AsSecureString }
 $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 try {
     $env:FOCUSGUARD_SIGN_PASSWORD=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)

@@ -17,6 +17,12 @@ class RulesTest {
     @Test fun missingUsageDoesNotInventLimit() { assertNull(RuleEngine.reason(Rule(true,false,false,10,null),monday,null,false,0)) }
     @Test fun limitThreshold() { val rule=Rule(true,false,false,10,null); assertNull(RuleEngine.reason(rule,monday,599999,false,0)); assertNotNull(RuleEngine.reason(rule,monday,600000,false,0)) }
     @Test fun bypassExpires() { val rule=Rule(true,true,false,0,null); val now=monday.toInstant().toEpochMilli(); assertNull(RuleEngine.reason(rule,monday,0,false,now+1)); assertNotNull(RuleEngine.reason(rule,monday,0,false,now)) }
+    @Test fun strictFocusOverridesAnEarlierBreakAllowance() {
+        val rule=Rule(true,false,true,0,null)
+        val allowance=monday.toInstant().toEpochMilli()+300000
+        assertNull(RuleEngine.reason(rule,monday,0,true,allowance,false))
+        assertNotNull(RuleEngine.reason(rule,monday,0,true,allowance,true))
+    }
     @Test fun focusAndDisabledRules() { assertNotNull(RuleEngine.reason(Rule(true,false,true,0,null),monday,0,true,0)); assertNull(RuleEngine.reason(Rule(false,true,true,1,null),monday,999999,true,0)) }
     @Test fun timerRestoresFromPersistedTimestamps() { val timer=TimerState(1000,60000); assertEquals(30000,timer.remaining(31000)); assertFalse(timer.active(61000)) }
     @Test fun pauseFreezesAndResumeSubtractsPause() { val timer=TimerState(1000,60000,11000); assertEquals(50000,timer.remaining(999999)); assertEquals(40000,timer.copy(pausedAtMs=0,pausedMs=10000).remaining(31000)) }
