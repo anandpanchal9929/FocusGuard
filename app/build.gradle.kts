@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+val cloudConfig = java.util.Properties().apply {
+    val configFile = rootProject.file("cloud.properties")
+    if (configFile.exists()) configFile.inputStream().use { load(it) }
+}
 android {
     namespace = "org.focusguard"
     compileSdk = 35
@@ -14,8 +18,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SUPABASE_URL", "\"${System.getenv("SUPABASE_URL") ?: ""}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${System.getenv("SUPABASE_ANON_KEY") ?: ""}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${System.getenv("SUPABASE_URL")?.takeIf { it.isNotBlank() } ?: cloudConfig.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${System.getenv("SUPABASE_ANON_KEY")?.takeIf { it.isNotBlank() } ?: cloudConfig.getProperty("SUPABASE_ANON_KEY", "")}\"")
     }
     signingConfigs {
         create("release") {

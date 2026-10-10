@@ -260,8 +260,8 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
                         val friends=try { JSONArray(friendsJson) } catch(e: Exception) { JSONArray() }
                         for(index in 0 until friends.length()) { val friend=friends.getJSONObject(index); Text("${friend.getString("user_id").take(8)} → ${friend.getString("friend_id").take(8)} · ${if(friend.getBoolean("accepted")) "Connected" else "Pending"}"); if(!friend.getBoolean("accepted") && friend.getString("friend_id")==p.str("userId")) TextButton(onClick={vm.run { vm.cloud.acceptFriend(friend.getString("user_id")); friendsJson=vm.cloud.friends() }}) { Text("Accept request") } }
                         var confirm by remember { mutableStateOf("") }
-                        OutlinedTextField(confirm,{confirm=it},label={Text("Type DELETE to delete cloud account")})
-                        Button(enabled=confirm=="DELETE",onClick={vm.run { vm.cloud.deleteAccount(); confirm="" }}) { Text("Delete cloud account and data") }
+                        OutlinedTextField(confirm,{confirm=it},label={Text("Type DELETE to delete FocusGuard cloud data")})
+                        Button(enabled=confirm=="DELETE",onClick={vm.run { vm.cloud.deleteAccount(); confirm="" }}) { Text("Delete FocusGuard cloud data") }
                     }
                     "Settings" -> {
                         Toggle("Dark theme",p.flag("dark")) { vm.bool("dark",it) }
@@ -273,7 +273,7 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
                         TextButton(onClick={deleteConfirm=true}) { Text("Delete local history") }
                         if(deleteConfirm) AlertDialog(onDismissRequest={deleteConfirm=false},title={Text("Delete local history?")},text={Text("This removes saved sessions and pending uploads. Cloud history is unaffected.")},confirmButton={TextButton(onClick={vm.run { vm.guard.database.dao().clearHistory(); vm.guard.database.dao().clearQueue() }; deleteConfirm=false}) { Text("Delete") }},dismissButton={TextButton(onClick={deleteConfirm=false}) { Text("Cancel") }})
                         Text("Privacy",style=MaterialTheme.typography.titleLarge)
-                        Text("Your app usage, blocking rules and focus history are stored locally. Accessibility is used only to evaluate foreground apps and known view IDs; screen text is never retained. Optional Supabase synchronization uploads focus history after you enable it. Authentication credentials are sent only to your configured Supabase project. Disable synchronization or delete your cloud account here. This app contains no advertising or analytics SDK.")
+                        Text("Your app usage, blocking rules and focus history are stored locally. Accessibility is used only to evaluate foreground apps and known view IDs; screen text is never retained. Optional Supabase synchronization uploads focus history after you enable it. Authentication credentials are sent only to your configured Supabase project. Delete FocusGuard cloud data from Profile. The shared sign-in account remains; its owner can request account deletion through the project administrator. This app contains no advertising or analytics SDK.")
                         Text("DNS filtering and short-video detection are experimental. Cloud features require a configured Supabase project. Clock changes affect timestamp-based timers. Device vendors can interrupt accessibility services; verify blocking after reboot.")
                     }
                 }

@@ -116,6 +116,6 @@ class CloudClient(private val app: FocusGuardApp) {
         val config=rows.getJSONObject(0).getJSONObject("settings")
         org.focusguard.sync.SettingsSync(app).apply(config)
     }
-    suspend fun deleteAccount() { request("/rest/v1/rpc/delete_my_account","POST","{}"); signOut() }
+    suspend fun deleteAccount() { request("/rest/v1/rpc/focusguard_delete_data","POST","{}"); signOut() }
     suspend fun signOut() = authLock.withLock { app.preferences.bool("sync",false); app.database.dao().clearQueue(); app.tokens.clear(); app.preferences.text("userId","") }
 }

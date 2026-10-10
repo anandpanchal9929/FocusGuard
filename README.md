@@ -8,10 +8,10 @@ This is an implementation under verification, not a completed production release
 
 ## Build
 
-Install Java 17 and Android SDK platform/build-tools 35. Install Gradle 8.11.1, then run:
+Install Java 17 and Android SDK platform/build-tools 35. The included Gradle wrapper pins Gradle 8.11.1. On macOS/Linux make gradlew executable, then run:
 
 ```sh
-gradle testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
 The installable development APK is at `app/build/outputs/apk/debug/app-debug.apk`. It is debug-signed and is separate from the production signing identity. GitHub Actions uploads this APK after successful verification. Instrumentation and Supabase pgTAP tests are separate CI jobs. CI execution is not implied by the presence of workflow files.
@@ -31,6 +31,8 @@ Accessibility can be revoked, the app can be uninstalled, and emergency/system s
 
 ## Cloud setup (optional)
 
+This deployment uses the restored project `cuveoqwrmofuvkynsbxj` with public client configuration in `cloud.properties`. Both FocusGuard migrations are deployed. `focusguard_profiles` avoids the other application's existing `profiles` table. FocusGuard cloud-data deletion preserves the shared sign-in account. All 17 hosted SQL tests passed; actual email sign-in and multi-device rooms still need integration testing. For a new installation, apply every migration in the migrations directory.
+
 Create a Supabase Free project, enable email authentication and apply `supabase/migrations/202610100001_initial.sql`. For reproducible local development install the official Supabase CLI and Docker, then run:
 
 ```sh
@@ -44,7 +46,7 @@ For a hosted project, `supabase link --project-ref YOUR_REF` then `supabase db p
 ```sh
 export SUPABASE_URL=https://YOUR_REF.supabase.co
 export SUPABASE_ANON_KEY=YOUR_PUBLIC_KEY
-gradle assembleDebug
+./gradlew assembleDebug
 ```
 
 On Windows set those environment variables in PowerShell with `$env:SUPABASE_URL` and `$env:SUPABASE_ANON_KEY`. Never embed a service-role key. Tokens are encrypted using an Android Keystore AES-GCM key. Signing out or switching accounts clears pending operations to prevent cross-account uploads. Raw usage stays local.
@@ -55,23 +57,19 @@ Rooms support creation, long invite codes, joining, owner starts, participant st
 
 ## Signing and free GitHub release
 
-Create a private release key outside the repository with Java `keytool` (keep an offline backup). Store these GitHub Actions secrets under a `release` environment:
-
-- `KEYSTORE_BASE64`: base64-encoded JKS keystore
-- `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
-
-Public repository/environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (optional). Do not paste private signing credentials into source files or chat.
+The owner selected local signing. Keep the private release keystore outside the repository and maintain an encrypted offline backup. Do not upload the key or password to GitHub. CI builds unsigned release inputs; the signed APK is uploaded separately after local signature verification.
 
 1. Update `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. Run unit tests, lint, emulator tests and device blocking checks.
-3. Commit/push to main, then tag the verified commit: `git tag v0.1.0 && git push origin v0.1.0`.
-4. The release workflow builds, verifies the signature and publishes `FocusGuard-v0.1.0.apk` plus SHA256SUMS to GitHub Releases.
+3. Commit/push to main. Run the Android verification workflow manually to publish a clearly labeled build-input ZIP, or download the unsigned release APK from its Actions artifact.
+4. Sign using `scripts/sign-local.ps1` and the private local keystore. Verify the signature and calculate SHA256. Create a release tagged at the tested commit and upload `FocusGuard-v0.1.0.apk` plus `SHA256SUMS.txt`. The tag workflow verifies source and builds unsigned artifacts; it does not receive the private signing key.
 5. Install updates with the same application ID and signing key. Android rejects an update signed with a different key.
 
-Public standard GitHub Actions runners and public Releases require no paid hosting. A signed production release is pending private signing setup. A download website is optional and has not been deployed.
+Public standard GitHub Actions runners and public Releases require no paid hosting. Signed APK publication is pending local retrieval/signing. A download website is optional and has not been deployed.
 
 ## Architecture and limitations
 
 Packages separate `core`, `data`, `usage`, `blocking`, `focus`, `web`, `network` and `sync`. App-scoped dependency construction supplies repositories to the Android ViewModel, Room DAO and services. UI state is exposed using StateFlow. WorkManager is used for synchronization, never realtime app blocking.
 
 See `PRIVACY.md`, `STATUS.md`, and `docs/DEVICE_TESTS.md`. There is no fabricated usage data, simulated online session, or fake release URL.
+

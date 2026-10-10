@@ -1,5 +1,5 @@
 create extension if not exists pgcrypto;
-create table public.profiles (
+create table public.focusguard_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default 'Student' check (length(display_name) <= 80),
   updated_at timestamptz not null default now()
@@ -62,8 +62,8 @@ $$;
 revoke all on function public.is_room_member(uuid) from public;
 grant execute on function public.is_room_member(uuid) to authenticated;
 do $$ declare tab text; owner_column text; begin
-  foreach tab in array array['profiles','user_preferences','focus_sessions','blocked_app_rules','usage_goals','sync_operations'] loop
-    owner_column := case when tab='profiles' then 'id' else 'user_id' end;
+  foreach tab in array array['focusguard_profiles','user_preferences','focus_sessions','blocked_app_rules','usage_goals','sync_operations'] loop
+    owner_column := case when tab='focusguard_profiles' then 'id' else 'user_id' end;
     execute format('alter table public.%I enable row level security',tab);
     execute format('create policy own_data on public.%I for all to authenticated using (%I=(select auth.uid())) with check (%I=(select auth.uid()))',tab,owner_column,owner_column);
   end loop;
@@ -85,11 +85,11 @@ create policy members_leave on public.room_members for delete to authenticated u
 alter table public.leaderboard_records enable row level security;
 create policy leaderboard_read on public.leaderboard_records for select to authenticated using(public.is_room_member(room_id));
 -- No client writes to leaderboard: trusted server computation only.
-grant select,insert,update,delete on public.profiles,public.user_preferences,public.focus_sessions,public.blocked_app_rules,public.usage_goals,public.sync_operations,public.friendships,public.focus_rooms,public.room_members to authenticated;
+grant select,insert,update,delete on public.focusguard_profiles,public.user_preferences,public.focus_sessions,public.blocked_app_rules,public.usage_goals,public.sync_operations,public.friendships,public.focus_rooms,public.room_members to authenticated;
 grant select on public.leaderboard_records to authenticated;
 revoke update on public.friendships from authenticated;
 grant update(accepted) on public.friendships to authenticated;
-revoke all on all tables in schema public from anon;
+revoke all on public.focusguard_profiles,public.user_preferences,public.focus_sessions,public.blocked_app_rules,public.usage_goals,public.sync_operations,public.friendships,public.focus_rooms,public.room_members,public.leaderboard_records from anon;
 create function public.join_room(invite text) returns uuid language plpgsql security definer set search_path = '' as $$
 declare room uuid; begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
@@ -100,13 +100,22 @@ declare room uuid; begin
 end $$;
 revoke all on function public.join_room(text) from public;
 grant execute on function public.join_room(text) to authenticated;
-create function public.delete_my_account() returns void language plpgsql security definer set search_path = '' as $$
+create function public.focusguard_delete_data() returns void language plpgsql security definer set search_path = '' as $$
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
-  delete from auth.users where id=auth.uid();
+  delete from public.focus_rooms where owner_id=auth.uid();
+  delete from public.room_members where user_id=auth.uid();
+  delete from public.leaderboard_records where user_id=auth.uid();
+  delete from public.friendships where auth.uid() in (user_id,friend_id);
+  delete from public.user_preferences where user_id=auth.uid();
+  delete from public.blocked_app_rules where user_id=auth.uid();
+  delete from public.usage_goals where user_id=auth.uid();
+  delete from public.sync_operations where user_id=auth.uid();
+  delete from public.focus_sessions where user_id=auth.uid();
+  delete from public.focusguard_profiles where id=auth.uid();
 end $$;
-revoke all on function public.delete_my_account() from public;
-grant execute on function public.delete_my_account() to authenticated;
+revoke all on function public.focusguard_delete_data() from public;
+grant execute on function public.focusguard_delete_data() to authenticated;
 alter publication supabase_realtime add table public.room_members, public.focus_rooms;
 create function public.add_room_owner() returns trigger language plpgsql security definer set search_path = '' as $$
 begin insert into public.room_members(room_id,user_id) values(new.id,new.owner_id); return new; end $$;

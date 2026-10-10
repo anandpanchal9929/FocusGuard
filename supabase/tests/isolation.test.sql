@@ -1,10 +1,10 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(17);
 insert into auth.users(id,aud,role,email) values
  ('00000000-0000-0000-0000-000000000001','authenticated','authenticated','a@test.invalid'),
  ('00000000-0000-0000-0000-000000000002','authenticated','authenticated','b@test.invalid');
-insert into public.profiles(id) values('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');
+insert into public.focusguard_profiles(id) values('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');
 insert into public.focus_sessions(id,user_id,started_at,ended_at,focused_ms,completed) values
  ('00000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000001',now(),now(),0,true),
  ('00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000002',now(),now(),0,true);
@@ -13,7 +13,7 @@ insert into public.focus_rooms(id,owner_id,name,invite_code) values
 insert into public.sync_operations(id,user_id) values('00000000-0000-0000-0000-000000000040','00000000-0000-0000-0000-000000000001');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',true);
-select is((select count(*)::int from public.profiles),1,'profiles are isolated');
+select is((select count(*)::int from public.focusguard_profiles),1,'profiles are isolated');
 select is((select count(*)::int from public.focus_sessions),1,'sessions are isolated');
 select is((select count(*)::int from public.focus_rooms),0,'private rooms are invisible');
 select throws_ok($$insert into public.user_preferences(user_id) values('00000000-0000-0000-0000-000000000001')$$,'42501',null,'cannot insert preferences for another account');
@@ -28,5 +28,10 @@ select public.apply_settings('00000000-0000-0000-0000-000000000031','{"theme":"l
 select is((select settings->'settings'->>'theme' from public.user_preferences),'dark','duplicate operation is idempotent');
 select throws_ok($$select public.apply_settings('00000000-0000-0000-0000-000000000033','{}','[]',now()+interval '10 minutes')$$,'P0001',null,'reject future clock skew');
 select throws_ok($$select public.apply_settings('00000000-0000-0000-0000-000000000040','{}','[]',now())$$,'P0001',null,'cannot reuse another users operation');
+select is(has_function_privilege('anon','public.apply_settings(uuid,jsonb,jsonb,timestamptz)','execute'),false,'anonymous callers cannot invoke settings RPC');
+select lives_ok($$select public.focusguard_delete_data()$$,'delete own FocusGuard cloud data');
+select is((select count(*)::int from public.focus_sessions),0,'own sessions removed');
+reset role;
+select is((select count(*)::int from auth.users where id='00000000-0000-0000-0000-000000000002'),1,'shared authentication account remains');
 select * from finish();
 rollback;
