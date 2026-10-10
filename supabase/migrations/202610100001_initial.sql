@@ -128,3 +128,21 @@ begin
   return new;
 end $$;
 create trigger session_leaderboard after insert on public.focus_sessions for each row execute function public.refresh_leaderboard();
+create function public.apply_settings(operation uuid,config jsonb,rules jsonb,client_updated_at timestamptz) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare result jsonb; previous_owner uuid; begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if client_updated_at>now()+interval '5 minutes' then raise exception 'Device clock is ahead; correct clock and retry'; end if;
+  if jsonb_typeof(config)<>'object' or jsonb_typeof(rules)<>'array' then raise exception 'Invalid settings'; end if;
+  select user_id into previous_owner from public.sync_operations where id=operation;
+  if previous_owner is not null and previous_owner<>auth.uid() then raise exception 'Operation belongs to another account'; end if;
+  if previous_owner is null then
+    insert into public.sync_operations(id,user_id) values(operation,auth.uid());
+    insert into public.user_preferences(user_id,settings,updated_at) values(auth.uid(),jsonb_build_object('settings',config,'rules',rules),client_updated_at)
+    on conflict(user_id) do update set settings=excluded.settings,updated_at=excluded.updated_at
+      where public.user_preferences.updated_at<excluded.updated_at;
+  end if;
+  select settings into result from public.user_preferences where user_id=auth.uid();
+  return result;
+end $$;
+revoke all on function public.apply_settings(uuid,jsonb,jsonb,timestamptz) from public;
+grant execute on function public.apply_settings(uuid,jsonb,jsonb,timestamptz) to authenticated;

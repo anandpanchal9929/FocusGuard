@@ -22,7 +22,7 @@ object DnsCodec {
     }
     fun unsigned16(bytes: ByteArray,offset: Int)=((bytes[offset].toInt() and 255) shl 8) or (bytes[offset+1].toInt() and 255)
     fun extract(packet: ByteArray): ByteArray? {
-        if(packet.size<28 || packet[0].toInt() ushr 4 and 15 !=4 || packet[9].toInt()!=17) return null
+        if(packet.size<28 || ((packet[0].toInt() ushr 4) and 15)!=4 || packet[9].toInt()!=17) return null
         val ip=(packet[0].toInt() and 15)*4
         if(ip<20 || ip+8>packet.size || unsigned16(packet,ip+2)!=53 || (unsigned16(packet,6) and 0x3fff)!=0) return null
         val len=unsigned16(packet,ip+4)

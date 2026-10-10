@@ -58,7 +58,13 @@ class CloudClient(private val app: FocusGuardApp) {
         val user=app.preferences.snapshot().str("userId")
         val payload=JSONObject(op.payload)
         check(payload.getString("user_id")==user) { "Queued operation belongs to a different account" }
-        request("/rest/v1/${op.tableName}?on_conflict=id","POST",payload.toString())
+        if(op.tableName=="settings_bundle") {
+            val p=app.preferences.snapshot()
+            if(!p.flag("syncSettings")) return
+            payload.remove("user_id")
+            val response=JSONObject(request("/rest/v1/rpc/apply_settings","POST",payload.toString()))
+            if(app.preferences.snapshot().num("settingsModified")<=op.createdAt) org.focusguard.sync.SettingsSync(app).apply(response)
+        } else request("/rest/v1/${op.tableName}?on_conflict=id","POST",payload.toString())
     }
     suspend fun restore(): Int {
         refresh()
@@ -89,7 +95,7 @@ class CloudClient(private val app: FocusGuardApp) {
                 val payload=JSONObject().put("access_token",token).put("config",JSONObject().put("postgres_changes",changes))
                 webSocket.send(JSONObject().put("topic","realtime:focusguard").put("event","phx_join").put("payload",payload).put("ref","1").toString())
             }
-            override fun onMessage(webSocket: WebSocket,text: String) { if(JSONObject(text).optString("event")=="postgres_changes") trySend(Unit) }
+            override fun onMessage(webSocket: WebSocket,text: String) { try { if(JSONObject(text).optString("event")=="postgres_changes") trySend(Unit) } catch(e: Exception) { close(e) } }
             override fun onFailure(webSocket: WebSocket,t: Throwable,response: Response?) { close(t) }
             override fun onClosed(webSocket: WebSocket,code: Int,reason: String) { close() }
         })
@@ -98,6 +104,14 @@ class CloudClient(private val app: FocusGuardApp) {
     }
     suspend fun friends()=request("/rest/v1/friendships?select=*")
     suspend fun inviteFriend(id: String)=request("/rest/v1/friendships","POST",JSONObject().put("user_id",app.preferences.snapshot().str("userId")).put("friend_id",id).toString())
+    suspend fun acceptFriend(id: String)=request("/rest/v1/friendships?user_id=eq.$id&friend_id=eq.${app.preferences.snapshot().str("userId")}","PATCH",JSONObject().put("accepted",true).toString())
+    suspend fun restoreSettings() {
+        val p=app.preferences.snapshot(); check(!(p.flag("strict") && p.timer().active(System.currentTimeMillis()))) { "Settings are locked during this session" }
+        val rows=JSONArray(request("/rest/v1/user_preferences?select=settings"))
+        if(rows.length()==0) error("No settings backup yet")
+        val config=rows.getJSONObject(0).getJSONObject("settings")
+        org.focusguard.sync.SettingsSync(app).apply(config)
+    }
     suspend fun deleteAccount() { request("/rest/v1/rpc/delete_my_account","POST","{}"); signOut() }
     suspend fun signOut() { app.preferences.bool("sync",false); app.database.dao().clearQueue(); app.tokens.clear(); app.preferences.text("userId","") }
 }

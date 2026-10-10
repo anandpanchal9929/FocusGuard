@@ -58,10 +58,10 @@ class GuardModel(app: android.app.Application) : AndroidViewModel(app) {
     init { refresh(); viewModelScope.launch { while(isActive) { val t=prefs.value.timer(); if(t.startMs>0 && t.durationMs>0 && t.remaining(System.currentTimeMillis())==0L) timer.finish(true); delay(1000) } } }
     fun run(block: suspend () -> Unit) { viewModelScope.launch { busy.value=true; try { block() } catch(e: Exception) { message.value=e.message ?: "Operation failed" } finally { busy.value=false } } }
     fun refresh(count: Int = 7) { run { withContext(Dispatchers.IO) { val repo=UsageRepository(guard); usage.value=repo.report(); days.value=(count-1 downTo 0).map { LocalDate.now().minusDays(it.toLong()).let { date -> date to repo.report(date) } } } } }
-    fun bool(key: String,value: Boolean)=run { guard.preferences.bool(key,value) }
-    fun num(key: String,value: Long)=run { guard.preferences.number(key,value) }
-    fun text(key: String,value: String)=run { guard.preferences.text(key,value) }
-    fun save(rule: AppRule)=run { guard.database.dao().save(rule) }
+    fun bool(key: String,value: Boolean)=run { guard.preferences.bool(key,value); if(key in org.focusguard.sync.SettingsSync.booleanKeys) org.focusguard.sync.SettingsSync(guard).enqueue() }
+    fun num(key: String,value: Long)=run { guard.preferences.number(key,value); if(key in org.focusguard.sync.SettingsSync.numberKeys) org.focusguard.sync.SettingsSync(guard).enqueue() }
+    fun text(key: String,value: String)=run { guard.preferences.text(key,value); if(key in org.focusguard.sync.SettingsSync.textKeys) org.focusguard.sync.SettingsSync(guard).enqueue() }
+    fun save(rule: AppRule)=run { guard.database.dao().save(rule); org.focusguard.sync.SettingsSync(guard).enqueue() }
     suspend fun export(): String {
         val sessions=JSONArray(); guard.database.dao().sessions().forEach { sessions.put(JSONObject().put("id",it.id).put("startedAt",it.startedAt).put("focusedMs",it.focusedMs).put("completed",it.completed)) }
         val rules=JSONArray(); guard.database.dao().allRules().forEach { rules.put(JSONObject().put("package",it.packageName).put("label",it.label).put("limitMinutes",it.limitMinutes).put("profile",it.profile)) }
@@ -122,7 +122,7 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
                             val previous=days.dropLast(1).lastOrNull()?.second?.totalMs
                             if(previous!=null) Text("Change from yesterday: ${((usage!!.totalMs-previous)/60_000)} min")
                             Text("Unlock events: ${usage!!.unlocks ?: "Unavailable on this Android version"}")
-                            Text("Activity resumes are reported as launch estimates; Android does not expose a universal exact launch count.")
+                            Text("Activity resumes are launch estimates. Screen time is reconstructed from retained usage events; missing old events can undercount, and multiwindow totals can overlap.")
                             usage!!.apps.entries.sortedByDescending { it.value }.forEach { (pkg,ms) -> Text("${vm.installed.firstOrNull { it.first==pkg }?.second ?: pkg}\n${duration(ms)} · ${usage!!.launches[pkg] ?: 0} resumes") }
                         }
                     }
@@ -245,10 +245,20 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
                         OutlinedTextField(email,{email=it},label={Text("Email")})
                         OutlinedTextField(password,{password=it},label={Text("Password")},visualTransformation=PasswordVisualTransformation())
                         Row { Button(onClick={vm.run { vm.cloud.authenticate(email,password,false); password="" }}) { Text("Sign in") }; TextButton(onClick={vm.run { vm.cloud.authenticate(email,password,true); password="" }}) { Text("Create account") } }
-                        Toggle("Sync new focus sessions",p.flag("sync")) { value -> vm.run { vm.guard.preferences.bool("sync",value); if(!value) vm.guard.database.dao().clearQueue() } }
+                        Toggle("Sync new focus sessions",p.flag("sync")) { value -> vm.run { if(value) check(p.str("userId").isNotBlank()) { "Sign in first" }; vm.guard.preferences.bool("sync",value); if(!value) vm.guard.database.dao().clearQueue() } }
+                        Toggle("Also sync settings and app rules",p.flag("syncSettings"),!strict) { value -> vm.run { check(p.str("userId").isNotBlank()) { "Sign in first" }; vm.guard.preferences.bool("syncSettings",value); if(value) org.focusguard.sync.SettingsSync(vm.guard).enqueue() } }
+                        Text("Settings sync includes selected app package names and domain rules, never raw usage. Timestamp conflicts resolve to the newest edit; keep device clocks accurate. Strict sessions defer configuration sync.")
+                        Button(enabled=!strict,onClick={vm.run { vm.cloud.restoreSettings(); vm.message.value="Cloud settings restored" }}) { Text("Restore settings (replaces local rules)") }
                         Text("Only opted-in focus history is queued. Raw app usage stays on your device. Automatic sync runs when connected, approximately every 15 minutes.")
                         Button(onClick={vm.run { vm.message.value="Restored ${vm.cloud.restore()} sessions" }}) { Text("Restore cloud history") }
                         TextButton(onClick={vm.run { vm.cloud.signOut() }}) { Text("Sign out") }
+                        Text("Your account ID: ${p.str("userId","Signed out")}")
+                        var friendId by remember { mutableStateOf("") }; var friendsJson by remember { mutableStateOf("[]") }
+                        OutlinedTextField(friendId,{friendId=it},label={Text("Friend's account UUID")})
+                        Button(onClick={vm.run { java.util.UUID.fromString(friendId); vm.cloud.inviteFriend(friendId); friendsJson=vm.cloud.friends() }}) { Text("Send friend request") }
+                        TextButton(onClick={vm.run { friendsJson=vm.cloud.friends() }}) { Text("Load friends and requests") }
+                        val friends=try { JSONArray(friendsJson) } catch(e: Exception) { JSONArray() }
+                        for(index in 0 until friends.length()) { val friend=friends.getJSONObject(index); Text("${friend.getString("user_id").take(8)} → ${friend.getString("friend_id").take(8)} · ${if(friend.getBoolean("accepted")) "Connected" else "Pending"}"); if(!friend.getBoolean("accepted") && friend.getString("friend_id")==p.str("userId")) TextButton(onClick={vm.run { vm.cloud.acceptFriend(friend.getString("user_id")); friendsJson=vm.cloud.friends() }}) { Text("Accept request") } }
                         var confirm by remember { mutableStateOf("") }
                         OutlinedTextField(confirm,{confirm=it},label={Text("Type DELETE to delete cloud account")})
                         Button(enabled=confirm=="DELETE",onClick={vm.run { vm.cloud.deleteAccount(); confirm="" }}) { Text("Delete cloud account and data") }
@@ -264,7 +274,7 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
                         if(deleteConfirm) AlertDialog(onDismissRequest={deleteConfirm=false},title={Text("Delete local history?")},text={Text("This removes saved sessions and pending uploads. Cloud history is unaffected.")},confirmButton={TextButton(onClick={vm.run { vm.guard.database.dao().clearHistory(); vm.guard.database.dao().clearQueue() }; deleteConfirm=false}) { Text("Delete") }},dismissButton={TextButton(onClick={deleteConfirm=false}) { Text("Cancel") }})
                         Text("Privacy",style=MaterialTheme.typography.titleLarge)
                         Text("Your app usage, blocking rules and focus history are stored locally. Accessibility is used only to evaluate foreground apps and known view IDs; screen text is never retained. Optional Supabase synchronization uploads focus history after you enable it. Authentication credentials are sent only to your configured Supabase project. Disable synchronization or delete your cloud account here. This app contains no advertising or analytics SDK.")
-                        Text("Limitations: no background timer notifications, website VPN, settings cloud backup, realtime group tracking or leaderboards are implemented yet. Clock changes affect timestamp-based timers. Device vendors can interrupt accessibility services; verify blocking after reboot.")
+                        Text("DNS filtering and short-video detection are experimental. Cloud features require a configured Supabase project. Clock changes affect timestamp-based timers. Device vendors can interrupt accessibility services; verify blocking after reboot.")
                     }
                 }
             }
@@ -294,4 +304,5 @@ private fun duration(ms: Long): String { val seconds=ms.coerceAtLeast(0)/1000; r
     }) { Text("Save schedule and profile") }
     TextButton(enabled=!strict,onClick={vm.save(rule.copy(startMinute=-1,endMinute=-1,profile=profile.ifBlank { "Default" }))}) { Text("Clear schedule / save profile") }
 }
+
 

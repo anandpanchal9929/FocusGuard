@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.Flow
     @Query("SELECT * FROM AppRule") suspend fun allRules(): List<AppRule>
     @Upsert suspend fun save(rule: AppRule)
     @Query("DELETE FROM AppRule WHERE packageName=:pkg") suspend fun remove(pkg: String)
+    @Query("DELETE FROM AppRule") suspend fun clearRules()
+    @Transaction suspend fun replaceRules(rules: List<AppRule>) { clearRules(); rules.forEach { save(it) } }
     @Query("SELECT * FROM FocusSession ORDER BY startedAt DESC") fun history(): Flow<List<FocusSession>>
     @Query("SELECT * FROM FocusSession ORDER BY startedAt DESC") suspend fun sessions(): List<FocusSession>
     @Upsert suspend fun session(value: FocusSession)

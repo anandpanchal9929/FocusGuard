@@ -65,13 +65,14 @@ class GuardService : AccessibilityService() {
         val home = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
         val launcher = packageManager.resolveActivity(home,0)?.activityInfo?.packageName
         val dialer = getSystemService(android.telecom.TelecomManager::class.java)?.defaultDialerPackage
-        if(foreground == packageName || foreground == launcher || foreground == dialer || foreground.startsWith("com.android.") || foreground.startsWith("com.google.android.permissioncontroller")) { dismiss(); return }
+        val protected=setOf("com.android.settings","com.android.systemui","com.android.phone","com.android.server.telecom","com.android.emergency","com.android.permissioncontroller","com.google.android.permissioncontroller","com.google.android.apps.safetyhub")
+        if(foreground == packageName || foreground == launcher || foreground == dialer || foreground in protected) { dismiss(); return }
         val strict = prefs.flag("strict") && prefs.timer().active(now)
         val focus = prefs.str("timerKind","focus")=="focus" && prefs.timer().active(now) && (strict || prefs.num("pausedAt") == 0L)
         val selected = rules.firstOrNull { it.packageName == foreground && it.profile == prefs.str("profile","Default") }
         var reason = selected?.let {
             val schedule = if(it.startMinute >= 0 && it.endMinute >= 0) Schedule(it.startMinute,it.endMinute,it.days.split(',').mapNotNull(String::toIntOrNull).toSet()) else null
-            RuleEngine.reason(Rule(it.enabled,it.always,it.focusOnly,it.limitMinutes,schedule),ZonedDateTime.now(),usage?.get(foreground),focus,it.bypassUntil)
+            RuleEngine.reason(Rule(it.enabled,it.always,it.focusOnly,it.limitMinutes,schedule),ZonedDateTime.now(),usage?.let { values -> values[foreground] ?: 0L },focus,it.bypassUntil)
         }
         if(reason == null && shortScreen && ((foreground == "com.google.android.youtube" && prefs.flag("shorts")) || (foreground == "com.instagram.android" && prefs.flag("reels")))) reason = "Short-video screen restriction"
         if(reason == null) dismiss() else show(reason,selected,strict)

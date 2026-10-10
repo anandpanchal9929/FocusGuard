@@ -28,7 +28,7 @@ android {
             }
         }
     }
-    buildTypes { release { signingConfig = signingConfigs.getByName("release"); isMinifyEnabled = false } }
+    buildTypes { release { signingConfig = if(System.getenv("KEYSTORE_PATH") != null) signingConfigs.getByName("release") else null; isMinifyEnabled = false } }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }

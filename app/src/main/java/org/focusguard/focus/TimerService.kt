@@ -26,11 +26,11 @@ class TimerService : Service() {
                 if(timer.startMs==0L) { stopSelf(); break }
                 if(timer.durationMs>0 && timer.remaining(now)==0L) {
                     FocusRepository(app).finish(true)
-                    if(p.flag("notifications")) manager.notify(3,Notification.Builder(this@TimerService,"complete").setSmallIcon(R.drawable.ic_guard).setContentTitle("Session complete").setContentText("Take a breath. Your progress is saved.").setContentIntent(open).setAutoCancel(true).build())
+                    if(p.flag("notifications") && (android.os.Build.VERSION.SDK_INT<33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED)) manager.notify(3,Notification.Builder(this@TimerService,"complete").setSmallIcon(R.drawable.ic_guard).setContentTitle("Session complete").setContentText("Take a breath. Your progress is saved.").setContentIntent(open).setAutoCancel(true).build())
                     stopSelf(); break
                 }
                 val time=if(timer.durationMs==0L) timer.elapsed(now) else timer.remaining(now)
-                manager.notify(1,Notification.Builder(this@TimerService,"timer").setSmallIcon(R.drawable.ic_guard).setContentTitle("FocusGuard · ${p.str("timerKind","focus")}").setContentText("${time/60_000}m ${time/1000%60}s ${if(timer.pausedAtMs>0) "· paused" else ""}").setOngoing(true).setContentIntent(open).build())
+                if(android.os.Build.VERSION.SDK_INT<33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED) manager.notify(1,Notification.Builder(this@TimerService,"timer").setSmallIcon(R.drawable.ic_guard).setContentTitle("FocusGuard · ${p.str("timerKind","focus")}").setContentText("${time/60_000}m ${time/1000%60}s ${if(timer.pausedAtMs>0) "· paused" else ""}").setOngoing(true).setContentIntent(open).build())
                 delay(1000)
             }
         }

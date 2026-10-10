@@ -16,6 +16,7 @@ class Preferences(private val context: Context) {
     suspend fun beginTimer(value: TimerState,kind: String) { context.guardStore.edit { p ->
         p[stringPreferencesKey("sessionId")]=java.util.UUID.randomUUID().toString()
         p[stringPreferencesKey("timerKind")]=kind
+        p[stringPreferencesKey("sessionOwner")]=p[stringPreferencesKey("userId")] ?: ""
         p[longPreferencesKey("start")]=value.startMs; p[longPreferencesKey("duration")]=value.durationMs
         p[longPreferencesKey("pausedAt")]=0; p[longPreferencesKey("paused")]=0
     } }

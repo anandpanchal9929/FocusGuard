@@ -17,13 +17,13 @@ Repository created: https://github.com/anandpanchal9929/FocusGuard
 
 ## Partial or not yet implemented
 
-- Settings/app-rule cloud sync and automated mutable conflict resolution; schema exists but these records are not uploaded.
-- Friend management UI; database schema exists.
+- Settings/app-rule cloud sync is implemented with explicit opt-in and timestamp conflict handling, but requires hosted integration testing.
+- Friend requests and acceptance use account UUIDs; email discovery and richer profiles are not implemented.
 - VPN DNS-over-TCP and encrypted-DNS handling; encrypted page filtering is not offered.
 - Detectors verified against current Instagram/YouTube interfaces; no device is available yet.
 - Fine-grained automatic Pomodoro cycles; users start the next focus/break manually.
 - App rules use one assignment per app rather than independently duplicating an app across profiles.
-- Screen-time aggregation currently uses platform aggregate usage and may reflect interval bucket boundaries; exact-duration reconstruction needs further verification.
+- Screen time is reconstructed from retained usage events, with midnight clipping. Missing old events can undercount, and multiwindow app totals can overlap.
 - Premium visual/layout/accessibility QA on an actual device; the UI is functional source but not yet visually verified.
 
 ## Executed checks

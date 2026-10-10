@@ -29,7 +29,7 @@ class FocusRepository(private val app: FocusGuardApp) {
         val id=p.str("sessionId").ifBlank { UUID.nameUUIDFromBytes("focusguard:${timer.startMs}".toByteArray()).toString() }
         val session=FocusSession(id,timer.startMs,now,elapsed,completed)
         val payload=JSONObject().put("id",id).put("user_id",p.str("userId")).put("started_at",java.time.Instant.ofEpochMilli(timer.startMs).toString()).put("ended_at",java.time.Instant.ofEpochMilli(now).toString()).put("focused_ms",elapsed).put("completed",completed)
-        if(p.str("timerKind","focus")=="focus") app.database.dao().finish(session, if(p.flag("sync") && p.str("userId").isNotBlank()) Outbox(id,"focus_sessions",payload.toString(),now) else null)
+        if(p.str("timerKind","focus")=="focus") app.database.dao().finish(session, if(p.flag("sync") && p.str("userId").isNotBlank() && p.str("sessionOwner")==p.str("userId")) Outbox(id,"focus_sessions",payload.toString(),now) else null)
         app.preferences.timer(TimerState(0,0))
         app.preferences.number("endRequested",0)
     }

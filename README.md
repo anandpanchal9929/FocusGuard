@@ -49,9 +49,9 @@ gradle assembleDebug
 
 On Windows set those environment variables in PowerShell with `$env:SUPABASE_URL` and `$env:SUPABASE_ANON_KEY`. Never embed a service-role key. Tokens are encrypted using an Android Keystore AES-GCM key. Signing out or switching accounts clears pending operations to prevent cross-account uploads. Raw usage stays local.
 
-Focus history is append-only on upload, with stable IDs, durable transactional outbox storage, conflict-ignore duplicate submissions and retry after network failure. Sync is opt-in for **new** sessions, every approximately 15 minutes on connected devices. Cloud restore merges session IDs. The UI must be signed in before enabling sync. Mutable settings/app-rule synchronization is not implemented yet; those tables are reserved for a future version.
+Focus history is append-only on upload, with stable IDs, durable transactional outbox storage, conflict-ignore duplicate submissions and retry after network failure. Sync is opt-in for **new** sessions, every approximately 15 minutes on connected devices. Cloud restore merges session IDs. The UI must be signed in before enabling sync. Optional settings/app-rule sync has a separate consent switch and a durable queue. Conflicts resolve to the newest client edit timestamp; server rejects clocks more than five minutes ahead. Sync is deferred during strict sessions. Keep device clocks accurate.
 
-Rooms support creation, long invite codes, joining, owner starts, participant status, Realtime updates with periodic recovery polling and a self-reported focus leaderboard computed by a server trigger. Individual timers run offline. Participant status can be stale offline. Leaderboard values are self-reported, not tamper-proof. Friendship schema exists; a friend-management UI is not implemented yet.
+Rooms support creation, long invite codes, joining, owner starts, participant status, Realtime updates with periodic recovery polling and a self-reported focus leaderboard computed by a server trigger. Individual timers run offline. Participant status can be stale offline. Leaderboard values are self-reported, not tamper-proof. Friend requests can be sent and accepted using account UUIDs.
 
 ## Signing and free GitHub release
 
