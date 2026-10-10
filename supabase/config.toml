@@ -1,0 +1,13 @@
+project_id = "focusguard"
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+[db]
+port = 54322
+major_version = 15
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+enable_signup = true
