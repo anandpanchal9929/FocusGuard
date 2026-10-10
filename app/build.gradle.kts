@@ -1,10 +1,12 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
-val cloudConfig = java.util.Properties().apply {
+val cloudConfig = Properties().apply {
     val configFile = rootProject.file("cloud.properties")
     if (configFile.exists()) configFile.inputStream().use { load(it) }
 }
