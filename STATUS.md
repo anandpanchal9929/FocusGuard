@@ -13,7 +13,7 @@ Repository created: https://github.com/anandpanchal9929/FocusGuard
 - Email auth, Android Keystore token storage, opted-in new-session sync, durable transactional outbox, duplicate-safe upload and cloud restore.
 - Supabase migrations for all requested tables, RLS, invite-gated membership, room owner starts, Realtime subscription/poll recovery and self-reported leaderboards.
 - Dark/light theme, permission recovery links, local JSON export, local-history deletion, FocusGuard cloud-data deletion and privacy disclosures.
-- Unit, Room instrumentation and SQL account-isolation test source. CI build, emulator, database and signed release workflows.
+- Unit, Room instrumentation and SQL account-isolation tests. CI build, emulator and database workflows; local release signing and public APK distribution.
 
 ## Partial or not yet implemented
 
@@ -28,15 +28,18 @@ Repository created: https://github.com/anandpanchal9929/FocusGuard
 
 ## Executed checks
 
-GitHub Actions run [38066317672](https://github.com/anandpanchal9929/FocusGuard/actions/runs/38066317672), triggered by commit `387b810cfaaa4e3acb9798bdc465ba0b08674f7a`, passed all three jobs:
+GitHub Actions run [38069047325](https://github.com/anandpanchal9929/FocusGuard/actions/runs/38069047325), at commit `81b6732875950fc90df0ce92248724bced072402`, passed all four jobs:
 
-- `testDebugUnitTest`, `lintDebug`, `assembleDebug`, and `assembleRelease` succeeded. Debug and unsigned release APKs were uploaded as the `FocusGuard-debug` artifact (the artifact contains both variants).
+- `testDebugUnitTest` (20 tests), `lintDebug`, `assembleDebug`, and `assembleRelease` succeeded. Tests include the strict-mode regression that overrides a previous temporary allowance. Debug and unsigned release APKs were uploaded as the `FocusGuard-debug` artifact (the artifact contains both variants).
 - `connectedDebugAndroidTest` succeeded on the API 35 emulator. This verifies the Room instrumentation test; real-device accessibility blocking, DNS behavior, and third-party screen detectors still require the device checklist.
-- `supabase test db` succeeded against a fresh local Supabase stack, including the 13 pgTAP account-isolation and settings-conflict assertions. This is not a hosted-cloud integration test.
+- `supabase test db` succeeded against a fresh local Supabase stack, including all 17 pgTAP account-isolation, settings-conflict, permission and deletion assertions.
+- `local_signing_input` published the unsigned build-input ZIP. Its SHA256 matched GitHub's published digest before extraction and local signing.
 
 Java 17, Gradle 8.11.1, and Android command-line tools are installed within the workspace. Gradle's wrapper-generation task ran successfully. Local SDK package installation encountered network errors; the successful Android builds ran on GitHub's runner.
 
 The user selected the existing Supabase project `cuveoqwrmofuvkynsbxj` and requested local signing. The project was restored and the FocusGuard schema deployed. Its existing `profiles` table belongs to another application, so FocusGuard uses `focusguard_profiles`; cloud deletion removes only FocusGuard data and preserves shared authentication. All 17 hosted SQL isolation/conflict/permission/deletion assertions passed inside a rolled-back test transaction. Live email sign-in and multi-device room behavior still need integration/device testing. The public project URL and publishable key are in `cloud.properties`; no private backend key is included.
 
-A private release keystore was generated outside source control, with its password protected by Windows DPAPI. The owner chose to keep signing local. Browser Actions-artifact downloads timed out; a manual CI job now publishes an explicitly labeled unsigned build-input ZIP for local signing. The cloud-configured rebuild and APK retrieval/signing are pending. No signed release APK or download website has been published.
+A private release keystore was generated outside source control, with its password protected by Windows DPAPI. The owner chose to keep signing local. No signing key or password was sent to GitHub. The final cloud-configured APK was signed locally and cryptographically verified with APK v2/v3 signatures. [v0.1.0](https://github.com/anandpanchal9929/FocusGuard/releases/tag/v0.1.0) is a published preview release at the tested commit; its [APK download](https://github.com/anandpanchal9929/FocusGuard/releases/download/v0.1.0/FocusGuard-v0.1.0.apk) returned HTTP 200. APK SHA256: `cea41fe303e9db473792e938961d1effd8d71e74c393f464c99feeb70d8855bd`.
+
+The public auth settings endpoint returned HTTP 200 with email sign-up enabled and confirmation required. Anonymous session-table reads and settings-RPC calls returned HTTP 401 permission denied. These probes do not replace authenticated Android integration tests. No download website has been deployed. Follow `docs/DEVICE_TESTS.md` on an actual Android device before treating this preview as production-ready.
 

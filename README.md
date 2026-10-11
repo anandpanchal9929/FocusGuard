@@ -4,7 +4,7 @@ Native Android screen-time controls and focus sessions. Kotlin, Jetpack Compose 
 
 ## Current delivery status
 
-This is an implementation under verification, not a completed production release. See `STATUS.md` for executed checks and limitations. Do not rely on experimental screen detectors or DNS filtering until device testing is complete.
+The signed [v0.1.0 Android preview](https://github.com/anandpanchal9929/FocusGuard/releases/tag/v0.1.0) is published. [Download the APK](https://github.com/anandpanchal9929/FocusGuard/releases/download/v0.1.0/FocusGuard-v0.1.0.apk). Android 8+ is required. See `STATUS.md` for executed checks and limitations. Real-device blocking, DNS filtering, screen detectors and cloud integration remain to be tested; this is not a production-ready release.
 
 ## Build
 
@@ -65,7 +65,7 @@ The owner selected local signing. Keep the private release keystore outside the 
 4. Sign using `scripts/sign-local.ps1` and the private local keystore. Verify the signature and calculate SHA256. Create a release tagged at the tested commit and upload `FocusGuard-v0.1.0.apk` plus `SHA256SUMS.txt`. The tag workflow verifies source and builds unsigned artifacts; it does not receive the private signing key.
 5. Install updates with the same application ID and signing key. Android rejects an update signed with a different key.
 
-Public standard GitHub Actions runners and public Releases require no paid hosting. Signed APK publication is pending local retrieval/signing. A download website is optional and has not been deployed.
+Public standard GitHub Actions runners and public Releases require no paid hosting. The v0.1.0 APK was signed locally and verified with APK v2/v3 signatures. Its SHA256 is `cea41fe303e9db473792e938961d1effd8d71e74c393f464c99feeb70d8855bd`. The release includes `SHA256SUMS.txt`. A download website has not been deployed.
 
 ## Architecture and limitations
 
